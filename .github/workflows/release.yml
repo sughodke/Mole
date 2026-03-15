@@ -103,6 +103,42 @@ jobs:
           draft: false
           prerelease: false
 
+  update-flake:
+    name: Update Nix Flake Hashes
+    runs-on: ubuntu-latest
+    needs: release
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v4
+        with:
+          ref: main
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#V}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update flake hashes
+        run: ./scripts/update-flake-hashes.sh "${{ steps.version.outputs.version }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Commit updated flake.nix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flake.nix
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "flake: update hashes for V${{ steps.version.outputs.version }}"
+            git push origin main
+          fi
+
   update-formula:
     runs-on: ubuntu-latest
     needs: release
